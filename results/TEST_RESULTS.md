@@ -11,9 +11,10 @@ Native vLLM versus loader auditing, using the same real GPU execution. These row
 | Qwen2.5-0.5B | 4 | 128/16 | 254.426 | 258.296 | 0.9850× | -1.50% | Exact per-request match |
 | Qwen2.5-0.5B | 8 | 64/32 | 512.184 | 522.868 | 0.9796× | -2.04% | Exact per-request match |
 
-
 Both models also completed the same real-weight matrix with TP2 on GPUs 4/7, in native and audited fresh sessions; both ranks agreed. TP2 sessions are smoke comparisons, not independent quartets.
 
 Fixed stack: existing 0z5a environment, RTX 5090, BF16, eager, synchronous engine, Triton attention, fixed 512 MiB KV budget. Other machine workloads remain running. GPUs 0–3 were not used. See the cross-rank report for the separate CPU simulator experiment.
+
 TinyLlama-1.1B: pending-request pause 251.783 ms, no kernels during pause, 2152 kernels observed in the complete diagnostic trace.
+
 Qwen2.5-0.5B: pending-request pause 251.429 ms, no kernels during pause, 2332 kernels observed in the complete diagnostic trace.

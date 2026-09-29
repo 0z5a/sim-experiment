@@ -22,7 +22,9 @@ Each rank submits one positive, **all-inclusive** step cost at the same safe sch
 
 Requests enter each scheduler only after their declared arrival. The original schedulers allocate/free KV blocks and choose the next batch. Simulated output is released only at the cross-rank completion frontier. Rank scheduling and completions must agree. Output token values are synthetic; only fixed-length request control is represented. Prefix cache and content-dependent features remain off.
 
-The queue-feedback test changes modeled durations while keeping arrivals fixed, then checks that the original scheduler's waiting queue changes. This is a sensitivity fixture, not a measured optimization claim.
+The queue-feedback test uses two 96-request waves separated by one second, changing modeled durations to 20% while keeping arrivals fixed. Maximum waiting requests change from 160 to 128. The initial 500 ms fixture left both versions before their first cohort completion and did not distinguish their maximum queue lengths; only this sensitivity fixture was revised. The held-out 500 ms workload and cost fit remain unchanged.
+
+The installed engine adds an eight-character random suffix to internal request IDs (`vllm/v1/engine/input_processor.py:279`). Reporting validates a complete one-to-one mapping back to the numeric external IDs before comparing rank and simulator batch membership. Raw internal IDs remain in the evidence.
 
 ## Cost accounting
 

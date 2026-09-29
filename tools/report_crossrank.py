@@ -5,6 +5,20 @@ from collections import defaultdict
 import json
 from pathlib import Path
 import statistics
+import re
+
+
+def external_ids(steps: list[dict], count: int) -> list[list[str]]:
+    mapping = {}
+    for step in steps:
+        for internal in step["ids"]:
+            match = re.fullmatch(r"(\d+)-[0-9a-f]{8}", internal)
+            if match is None:
+                raise ValueError(f"Unexpected engine request ID: {internal}")
+            mapping[internal] = match[1]
+    if len(mapping) != count or set(mapping.values()) != {str(i) for i in range(count)}:
+        raise ValueError("Engine request IDs are not a one-to-one workload mapping")
+    return [[mapping[rid] for rid in step["ids"]] for step in steps]
 
 
 def main() -> None:
@@ -17,8 +31,10 @@ def main() -> None:
     grouped = defaultdict(list)
     for left, right, sim in zip(real[0]["validation"], real[1]["validation"], simulated["results"], strict=True):
         assert left["workload"] == right["workload"] == sim["workload"]
-        assert [s["ids"] for s in left["steps"]] == [s["ids"] for s in right["steps"]]
-        membership_matches = [s["ids"] for s in left["steps"]] == [s["ids"] for s in sim["steps"]]
+        count = left["workload"]["requests"]
+        left_ids = external_ids(left["steps"], count)
+        assert left_ids == external_ids(right["steps"], count)
+        membership_matches = left_ids == [s["ids"] for s in sim["steps"]]
         for metric in ("completed_requests", "generated_tokens"):
             assert left["metrics"][metric] == right["metrics"][metric] == sim["metrics"][metric]
         duration = max(left["metrics"]["finish_ns"], right["metrics"]["finish_ns"])
@@ -41,7 +57,7 @@ def main() -> None:
         row["accuracy_goal_met"] = all(abs(row[key]) <= 10 for key in (
             "duration_error_pct", "throughput_error_pct", "ttft_error_pct", "itl_error_pct"))
         rows.append(row)
-    slow = next(x for x in simulated["results"] if x["workload"]["name"] == "two-waves-192")
+    slow = simulated["feedback_reference"]
     fast = simulated["feedback_faster_device"]
     feedback = {"normal_max_waiting": max(s["waiting"] for s in slow["steps"]),
                 "faster_max_waiting": max(s["waiting"] for s in fast["steps"]),
@@ -63,7 +79,7 @@ def main() -> None:
     for r in rows:
         lines.append(f"| {r['workload']} | {r['real_ns']/1e9:.3f} | {r['sim_wall_ns']/1e9:.3f} | {r['speedup']:.1f}× | {r['duration_error_pct']:+.2f}% | {r['throughput_error_pct']:+.2f}% | {r['ttft_error_pct']:+.2f}% | {r['itl_error_pct']:+.2f}% |")
     lines += ["", "Initial accuracy target (absolute median errors ≤10% for all four metrics in every workload): " + ("PASS" if report["all_accuracy_goals_met"] else "NOT MET") + "."]
-    lines += ["", f"One-time real initialization, warmup and calibration: {setup/1e9:.2f} s. Complete CPU process measurement (imports, fit, 12 validation workloads and an additional feedback check): {simulated['external_wall_ns']/1e9:.2f} s. Real validation workload total: {real_total/1e9:.2f} s.", "", f"Campaign speedup with an existing calibration: {report['campaign_speedup_excluding_calibration']:.2f}×. Charging this campaign the entire one-time calibration cost: {report['campaign_speedup_including_calibration']:.2f}×. Downloads are excluded. Workload rows exclude process startup and calibration; campaign figures include simulator startup.", "", f"Feedback check: reducing modeled step durations to 20% changes the original scheduler's maximum waiting queue from {feedback['normal_max_waiting']} to {feedback['faster_max_waiting']}. This is a causal sensitivity fixture, not a measured device optimization.", "", "The cost model is fit only from calibration files (batches 1/8/16/32, prompts 32/64/128, O=96). Held-out requests/arrivals/output lengths are not used for fitting. Mixed prefill/decode steps and features outside the calibration domain are rejected. Rank costs include communication and host overhead; NCCL is not added again.", "", "Fixed token counts and request lifetimes are validated. Synthetic token values do not reproduce model text. No CUDA context is initialized by the simulation. GPU 4/7 were shared during calibration/validation; see the saved GPU/process snapshots and failed-run notes. These results are conditional on that measured stack and contention, and are not isolated-hardware estimates or statistical confidence intervals.", ""]
+    lines += ["", f"One-time real initialization, warmup and calibration: {setup/1e9:.2f} s. Complete CPU process measurement (imports, fit, 12 validation workloads and two feedback scenarios): {simulated['external_wall_ns']/1e9:.2f} s. Real validation workload total: {real_total/1e9:.2f} s.", "", f"Campaign speedup with an existing calibration: {report['campaign_speedup_excluding_calibration']:.2f}×. Charging this campaign the entire one-time calibration cost: {report['campaign_speedup_including_calibration']:.2f}×. Downloads are excluded. Workload rows exclude process startup and calibration; campaign figures include simulator startup.", "", f"Feedback check: reducing modeled step durations to 20% changes the original scheduler's maximum waiting queue from {feedback['normal_max_waiting']} to {feedback['faster_max_waiting']}. This is a causal sensitivity fixture, not a measured device optimization.", "", "The cost model is fit only from calibration files (batches 1/8/16/32, prompts 32/64/128, O=96). Held-out requests/arrivals/output lengths are not used for fitting. Mixed prefill/decode steps and features outside the calibration domain are rejected. Rank costs include communication and host overhead; NCCL is not added again.", "", "Fixed token counts and request lifetimes are validated. Synthetic token values do not reproduce model text. No CUDA context is initialized by the simulation. GPU 4/7 were shared during calibration/validation; see the saved GPU/process snapshots and failed-run notes. These results are conditional on that measured stack and contention, and are not isolated-hardware estimates or statistical confidence intervals.", ""]
     (args.root / "TEST_RESULTS.md").write_text("\n".join(lines))
     print("\n".join(lines))
 

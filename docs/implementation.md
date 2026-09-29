@@ -2,7 +2,7 @@
 
 ## Scope
 
-The target is an unmodified installed vLLM/PyTorch stack with CUDA/NCCL ABI interposition, device/control semantics, and calibrated causal time. This checkpoint implements the M0 real-GPU baseline and feasibility probes. It does not implement GPU-free execution, a performance database, or simulated serving throughput.
+The target is an unmodified installed vLLM/PyTorch stack with CUDA/NCCL ABI interposition, device/control semantics, and calibrated causal time. This document covers the M0 real-GPU baseline and feasibility probes. A separate [CPU scheduler-boundary prototype](crossrank.md) implements calibrated cross-rank timing and serving predictions; it does not satisfy the unmodified-engine ABI acceptance gates below.
 
 The model workload uses explicit prompt IDs, greedy decoding, fixed output lengths, no detokenization, eager execution, synchronous scheduling, no prefix cache, and a fixed 512 MiB KV budget. Timing includes request submission, the original scheduler, model execution, and output processing. It excludes model loading, warmup, profiling, and HTTP transport.
 

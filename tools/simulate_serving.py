@@ -95,9 +95,12 @@ def main() -> None:
         models.append(StepModel([step for case in calibration for step in case["steps"]]))
     setup_ns = time.perf_counter_ns() - PROCESS_START
     results = [run(case, config_bytes, models, 1.0) for repeat in range(3) for case in validation_workloads()]
-    feedback = run(Workload("two-waves-192", 192, 64, 64, 500_000_000), config_bytes, models, 0.2)
+    feedback_case = Workload("feedback-192", 192, 64, 64, 1_000_000_000)
+    feedback_reference = run(feedback_case, config_bytes, models, 1.0)
+    feedback = run(feedback_case, config_bytes, models, 0.2)
     document = {"mode": "scheduler_boundary_adapter", "abi_simulation": False,
                 "cuda_initialized": torch.cuda.is_initialized(), "results": results,
+                "feedback_reference": feedback_reference,
                 "feedback_faster_device": feedback, "setup_ns": setup_ns,
                 "process_wall_ns": time.perf_counter_ns() - PROCESS_START,
                 "config_sha256": hashlib.sha256(config_bytes).hexdigest()}
