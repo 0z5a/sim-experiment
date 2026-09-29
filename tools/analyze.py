@@ -24,7 +24,7 @@ def compare(documents: list[dict]) -> list[dict]:
         raise ValueError("Four distinct fresh processes are required")
     reference = documents[0]
     for document in documents[1:]:
-        for field in ("versions", "visible_devices", "sources", "resolved_config"):
+        for field in ("versions", "visible_devices", "sources", "resolved_config", "harness_sha256"):
             if document[field] != reference[field]:
                 raise ValueError(f"Different experiment contract: {field}")
     arms = [keyed_runs(d) for d in documents]

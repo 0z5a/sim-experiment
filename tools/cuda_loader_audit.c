@@ -14,18 +14,28 @@
 typedef CUresult (*ResolverV1)(const char *, void **, int, cuuint64_t);
 typedef CUresult (*ResolverV2)(const char *, void **, int, cuuint64_t,
                                CUdriverProcAddressQueryResult *);
-static ResolverV1 resolve_v1;
-static ResolverV2 resolve_v2;
+typedef CUresult (*ExportTable)(const void **, const CUuuid *);
+static _Atomic(ResolverV1) resolve_v1;
+static _Atomic(ResolverV2) resolve_v2;
+static _Atomic(ExportTable) export_table;
 static int trace_fd = -1;
 static _Atomic unsigned long sequence;
 static _Atomic unsigned long write_errors;
 static CUresult audited_resolve_v1(const char *, void **, int, cuuint64_t);
 static CUresult audited_resolve_v2(const char *, void **, int, cuuint64_t,
                                   CUdriverProcAddressQueryResult *);
+static CUresult audited_export_table(const void **, const CUuuid *);
+static void record(const char *, const char *, uintptr_t, int,
+                   unsigned long long, int);
 
 static void wrap_resolver(const char *name, void **fn, int version, CUresult result) {
-    if (result != CUDA_SUCCESS || !*fn || strcmp(name, "cuGetProcAddress") != 0)
+    if (result != CUDA_SUCCESS || !*fn) return;
+    if (strcmp(name, "cuGetExportTable") == 0) {
+        export_table = (ExportTable)*fn;
+        *fn = (void *)audited_export_table;
         return;
+    }
+    if (strcmp(name, "cuGetProcAddress") != 0) return;
     if (version >= 12000) {
         resolve_v2 = (ResolverV2)*fn;
         *fn = (void *)audited_resolve_v2;
@@ -33,6 +43,16 @@ static void wrap_resolver(const char *name, void **fn, int version, CUresult res
         resolve_v1 = (ResolverV1)*fn;
         *fn = (void *)audited_resolve_v1;
     }
+}
+
+static CUresult audited_export_table(const void **table, const CUuuid *uuid) {
+    CUresult result = atomic_load(&export_table)(table, uuid);
+    char name[33];
+    for (int i = 0; i < 16; ++i)
+        snprintf(name + i * 2, 3, "%02x", (unsigned char)uuid->bytes[i]);
+    record("export_table", name, result == CUDA_SUCCESS ? (uintptr_t)*table : 0,
+           0, 0, result);
+    return result;
 }
 
 static void record(const char *kind, const char *name, uintptr_t address,
@@ -55,7 +75,7 @@ static void record(const char *kind, const char *name, uintptr_t address,
 
 static CUresult audited_resolve_v1(const char *name, void **fn, int version,
                                   cuuint64_t flags) {
-    CUresult result = resolve_v1(name, fn, version, flags);
+    CUresult result = atomic_load(&resolve_v1)(name, fn, version, flags);
     record("resolve", name, result == CUDA_SUCCESS ? (uintptr_t)*fn : 0,
            version, flags, result);
     wrap_resolver(name, fn, version, result);
@@ -65,7 +85,7 @@ static CUresult audited_resolve_v1(const char *name, void **fn, int version,
 static CUresult audited_resolve_v2(const char *name, void **fn, int version,
                                   cuuint64_t flags,
                                   CUdriverProcAddressQueryResult *status) {
-    CUresult result = resolve_v2(name, fn, version, flags, status);
+    CUresult result = atomic_load(&resolve_v2)(name, fn, version, flags, status);
     record("resolve_v2", name, result == CUDA_SUCCESS ? (uintptr_t)*fn : 0,
            version, flags, result);
     wrap_resolver(name, fn, version, result);
@@ -106,6 +126,10 @@ uintptr_t la_symbind64(Elf64_Sym *symbol, unsigned int index,
     if (strcmp(name, "cuGetProcAddress_v2") == 0) {
         resolve_v2 = (ResolverV2)address;
         return (uintptr_t)audited_resolve_v2;
+    }
+    if (strcmp(name, "cuGetExportTable") == 0) {
+        export_table = (ExportTable)address;
+        return (uintptr_t)audited_export_table;
     }
     return address;
 }

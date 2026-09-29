@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
-cd /home/gongji/0z5a/work/llm-serving-simulator-20260929
-export CUDA_VISIBLE_DEVICES=GPU-739fcff8-0a90-fd63-8d91-65847ad665d2
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+export CUDA_VISIBLE_DEVICES=${SIM_GPUS:-GPU-739fcff8-0a90-fd63-8d91-65847ad665d2}
 export VLLM_ENABLE_V1_MULTIPROCESSING=0
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
 export HF_HOME="$PWD/cache/hf"

@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import statistics
+import subprocess
+import sys
 import time
 
 import torch
@@ -51,18 +53,25 @@ def main() -> None:
     parser.add_argument("--model", required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--tp", type=int, choices=(1, 2), default=1)
     parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
     assert os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] == "0"
     assert os.environ["CUDA_VISIBLE_DEVICES"] in (
         "GPU-739fcff8-0a90-fd63-8d91-65847ad665d2",
         "GPU-c1e2d922-6fb4-92a2-c9e3-9f4ef9d9c079",
+        "GPU-739fcff8-0a90-fd63-8d91-65847ad665d2,GPU-c1e2d922-6fb4-92a2-c9e3-9f4ef9d9c079",
     )
+    before = subprocess.check_output([
+        "nvidia-smi", "-i", os.environ["CUDA_VISIBLE_DEVICES"],
+        "--query-gpu=uuid,name,driver_version,memory.used,temperature.gpu,clocks.sm,power.draw",
+        "--format=csv", ], text=True)
     config = EngineArgs(
-        model=args.model, dtype="bfloat16", tensor_parallel_size=1,
+        model=args.model, dtype="bfloat16", tensor_parallel_size=args.tp,
         enforce_eager=True, async_scheduling=False,
         enable_prefix_caching=False, enable_chunked_prefill=False,
-        disable_custom_all_reduce=True, distributed_executor_backend="uni",
+        disable_custom_all_reduce=True,
+        distributed_executor_backend="uni" if args.tp == 1 else "external_launcher",
         kv_cache_memory_bytes=512 * 1024 * 1024, max_model_len=1024,
         max_num_seqs=8, max_num_batched_tokens=1024,
         skip_tokenizer_init=True, seed=0, compilation_config={"mode": 0},
@@ -104,6 +113,9 @@ def main() -> None:
         sources[str(source)] = hashlib.sha256(source.read_bytes()).hexdigest()
     result = {
         "mode": "real_gpu", "compatibility": "U0", "pid": os.getpid(),
+        "python": sys.executable, "rank": int(os.environ.get("RANK", "0")),
+        "tp": args.tp, "host_load": os.getloadavg(), "device_before": before,
+        "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "versions": {p: importlib.metadata.version(p) for p in ("torch", "vllm", "triton", "transformers")},
         "device": torch.cuda.get_device_name(0), "visible_devices": os.environ["CUDA_VISIBLE_DEVICES"],
         "engine_core_type": type(engine.engine_core).__name__, "sources": sources,
