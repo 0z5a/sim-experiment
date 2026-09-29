@@ -1,0 +1,62 @@
+{
+  "comparison": "native vs loader audit, real GPU",
+  "evidence": "one fresh quartet",
+  "rows": [
+    {
+      "batch": 1,
+      "prompt": 32,
+      "output": 4,
+      "baseline_ms": 57.84302445963825,
+      "instrumented_ms": 57.52135310362327,
+      "speed_ratio": 1.0055922077395414,
+      "throughput_change_pct": 0.5592207739541388,
+      "latency_change_pct": -0.5561108863514463,
+      "arm_medians_ms": [
+        58.537584,
+        56.543386,
+        58.516235,
+        57.156706
+      ],
+      "token_identity": true
+    },
+    {
+      "batch": 4,
+      "prompt": 128,
+      "output": 16,
+      "baseline_ms": 233.8645412533273,
+      "instrumented_ms": 232.94251405547712,
+      "speed_ratio": 1.003958174838066,
+      "throughput_change_pct": 0.3958174838065931,
+      "latency_change_pct": -0.3942569458836531,
+      "arm_medians_ms": [
+        239.080969,
+        228.142411,
+        237.843611,
+        228.761929
+      ],
+      "token_identity": true
+    },
+    {
+      "batch": 8,
+      "prompt": 64,
+      "output": 32,
+      "baseline_ms": 467.8801269358632,
+      "instrumented_ms": 468.7474999450233,
+      "speed_ratio": 0.998149594378078,
+      "throughput_change_pct": -0.18504056219219578,
+      "latency_change_pct": 0.18538359704236562,
+      "arm_medians_ms": [
+        474.821976,
+        457.437043,
+        480.337616,
+        461.039767
+      ],
+      "token_identity": true
+    }
+  ],
+  "pause_probe": {
+    "pause_ms": 251.783391,
+    "kernels_during_pause": 0,
+    "total_kernels": 2152
+  }
+}
