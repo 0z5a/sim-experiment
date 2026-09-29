@@ -11,6 +11,16 @@ CPU scheduler-boundary adapter; this is not U0 CUDA/NCCL ABI simulation. Qwen2.5
 
 Initial accuracy target (absolute median errors ≤10% for all four metrics in every workload): NOT MET.
 
+| Workload | CPU prediction vs GPU oracle: duration hits | Throughput hits | TTFT hits | ITL hits | All four hit |
+|---|---:|---:|---:|---:|---:|
+| burst-128 | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) |
+| burst-256 | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) |
+| burst-512 | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) | 3/3 (100.00%) |
+| two-waves-192 | 3/3 (100.00%) | 3/3 (100.00%) | 0/3 (0.00%) | 3/3 (100.00%) | 0/3 (0.00%) |
+| Total | 12/12 (100.00%) | 12/12 (100.00%) | 9/12 (75.00%) | 12/12 (100.00%) | 9/12 (75.00%) |
+
+A prediction hits when its absolute relative error against the GPU run is ≤10% (inclusive). Counts use individual held-out workload repeats, not the median error and not lookup/cache coverage. Duration uses the slower real rank; throughput uses that duration; TTFT and ITL use rank 0 host-visible token timestamps, matching the error table above. CPU refers to the simulator producing the prediction, not a separately modeled CPU execution cost. The 12 trials share one real-engine session and are not independent hardware restarts.
+
 One-time real initialization, warmup and calibration: 168.10 s. Complete CPU process measurement (imports, fit, 12 validation workloads and two feedback scenarios): 22.17 s. Real validation workload total: 281.62 s.
 
 Campaign speedup with an existing calibration: 12.70×. Charging this campaign the entire one-time calibration cost: 1.48×. Downloads are excluded. Workload rows exclude process startup and calibration; campaign figures include simulator startup.
